@@ -16,11 +16,10 @@ const PharmaciesPage: React.FC = () => {
   const navigate = useNavigate();
 
   const {
-    pharmacies,
+    pharmacies: allPharmacies,
     setPharmacies,
     fetchPharmacies,
     fetchPharmaciesByCity,
-    pharmacies: allPharmacies,
   } = useStore();
 
   const [searchCity, setSearchCity] = useState('');
@@ -33,7 +32,7 @@ const PharmaciesPage: React.FC = () => {
 
   // Calculate distance between two lat/lng points in km
   const getDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Earth radius in km
+    const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
@@ -45,17 +44,28 @@ const PharmaciesPage: React.FC = () => {
     return R * c;
   }, []);
 
-  const handleSearch = useCallback(() => {
-    if (!searchCity.trim()) {
-      setIsSearching(true);
-      fetchPharmacies().finally(() => setIsSearching(false));
-      setShowCityOptions(false);
-      return;
+  useEffect(() => {
+    fetchPharmacies();
+  }, [fetchPharmacies]);
+
+  useEffect(() => {
+    if (allPharmacies.length) {
+      const uniqueCities = Array.from(new Set(allPharmacies.map((p) => p.city)));
+      setCityOptions(uniqueCities);
     }
-    setIsSearching(true);
-    fetchPharmaciesByCity(searchCity.trim()).finally(() => setIsSearching(false));
-    setShowCityOptions(false);
-  }, [fetchPharmacies, fetchPharmaciesByCity, searchCity]);
+  }, [allPharmacies]);
+
+  const filteredPharmacies = searchCity.trim()
+    ? allPharmacies.filter((p) =>
+        p.city.toLowerCase().includes(searchCity.trim().toLowerCase())
+      )
+    : allPharmacies;
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchCity(val);
+    setShowCityOptions(val.trim().length > 0);
+  };
 
   const handleCitySelect = (city: string) => {
     setSearchCity(city);
@@ -63,12 +73,7 @@ const PharmaciesPage: React.FC = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleSearch();
-  };
-
-  const handleViewMap = (pharmacy: Pharmacy) => {
-    setSelectedPharmacy(pharmacy);
-    setShowMapModal(true);
+    if (e.key === 'Enter') setShowCityOptions(false);
   };
 
   const handleUseMyLocation = () => {
@@ -97,31 +102,20 @@ const PharmaciesPage: React.FC = () => {
     );
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSearchCity(val);
-    setShowCityOptions(val.trim().length > 0);
-  };
-
   const handleCloseMapModal = () => setShowMapModal(false);
 
-  // Extract unique cities from pharmacies for autocomplete
-  useEffect(() => {
-    if (allPharmacies.length) {
-      const uniqueCities = Array.from(new Set(allPharmacies.map((p) => p.city)));
-      setCityOptions(uniqueCities);
-    }
-  }, [allPharmacies]);
+  const handleViewMap = (pharmacy: Pharmacy) => {
+    setSelectedPharmacy(pharmacy);
+    setShowMapModal(true);
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Header */}
       <header className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">{t('pharmacies.title')}</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">{t('pharmacies.subtitle')}</p>
       </header>
 
-      {/* Search */}
       <section className="max-w-xl mx-auto mb-12">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-grow">
@@ -153,14 +147,6 @@ const PharmaciesPage: React.FC = () => {
             )}
           </div>
           <Button
-            onClick={handleSearch}
-            isLoading={isSearching}
-            icon={<Search className="h-5 w-5" />}
-            className="md:w-auto"
-          >
-            {t('pharmacies.searchButton')}
-          </Button>
-          <Button
             variant="secondary"
             onClick={handleUseMyLocation}
             icon={<MapPin className="h-5 w-5" />}
@@ -172,24 +158,22 @@ const PharmaciesPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Results */}
       <section>
-        {searchCity && (
+        {searchCity.trim() ? (
           <h2 className="text-xl font-semibold mb-4">
             {t('pharmacies.pharmaciesIn', { city: searchCity })}
           </h2>
+        ) : (
+          <h2 className="text-xl font-semibold mb-4">{t('pharmacies.allPharmacies')}</h2>
         )}
 
-        {pharmacies.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-600 mb-4">{t('pharmacies.noResults')}</p>
-            <Button onClick={() => fetchPharmacies()} variant="outline">
-              {t('pharmacies.viewAll')}
-            </Button>
-          </div>
+        {isSearching ? (
+          <p className="text-center text-gray-500">{t('pharmacies.loading')}</p>
+        ) : filteredPharmacies.length === 0 ? (
+          <p className="text-center text-gray-600">{t('pharmacies.noResults')}</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {pharmacies.map((pharmacy, i) => (
+            {filteredPharmacies.map((pharmacy, i) => (
               <motion.div
                 key={pharmacy.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -233,7 +217,6 @@ const PharmaciesPage: React.FC = () => {
         )}
       </section>
 
-      {/* Map Modal */}
       {showMapModal && selectedPharmacy && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-3xl w-full relative">

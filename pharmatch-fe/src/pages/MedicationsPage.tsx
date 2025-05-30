@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, CheckCircle, XCircle } from 'lucide-react';
 import Input from '../components/ui/Input';
@@ -11,39 +11,36 @@ import { motion } from 'framer-motion';
 
 const MedicationsPage: React.FC = () => {
   const { t } = useTranslation();
-  const { medications, searchMedications, fetchMedications } = useStore();
+  const { medications, fetchMedications } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [filteredMedications, setFilteredMedications] = useState([]);
 
   const navigate = useNavigate();
   const categories = Array.from(new Set(medications.map(m => m.category)));
 
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      setIsSearching(true);
-      searchMedications(searchQuery.trim()).finally(() => setIsSearching(false));
-      setActiveCategory(null);
-    } else {
-      setIsSearching(true);
-      fetchMedications().finally(() => setIsSearching(false));
-      setActiveCategory(null);
-    }
-  };
+  useEffect(() => {
+    fetchMedications();
+  }, [fetchMedications]);
 
-  const handleCategoryFilter = (category: string) => {
-    if (activeCategory === category) {
-      setActiveCategory(null);
-      fetchMedications();
-    } else {
-      setActiveCategory(category);
-      searchMedications(category);
+  useEffect(() => {
+    filterMedications();
+  }, [medications, searchQuery, activeCategory]);
+
+  const filterMedications = () => {
+    let filtered = medications;
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
+    if (activeCategory) {
+      filtered = filtered.filter(m => m.category === activeCategory);
+    }
+    setFilteredMedications(filtered);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSearch();
+      filterMedications();
     }
   };
 
@@ -55,34 +52,24 @@ const MedicationsPage: React.FC = () => {
       </div>
 
       <div className="max-w-xl mx-auto mb-8">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-grow">
-            <Input
-              type="text"
-              placeholder={t('medications.searchPlaceholder')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              icon={<Search className="h-5 w-5" />}
-              className="w-full"
-            />
-          </div>
-          <Button onClick={handleSearch} isLoading={isSearching} className="w-full sm:w-auto">
-            {t('medications.searchButton')}
-          </Button>
-        </div>
+        <Input
+          type="text"
+          placeholder={t('medications.searchPlaceholder')}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          icon={<Search className="h-5 w-5" />}
+          className="w-full"
+        />
       </div>
 
       <div className="mb-8">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 justify-center">
           {categories.map((category) => (
             <button
               key={category}
-              className={`cursor-pointer px-3 py-1 text-sm ${
-                activeCategory === category ? 'border border-cyan-600' : 'border border-transparent'
-              }`}
-              value={category}
-              onClick={() => handleCategoryFilter(category)}
+              className={`cursor-pointer px-3 py-1 text-sm rounded-full border ${activeCategory === category ? 'border-cyan-600 bg-cyan-100' : 'border-gray-300'}`}
+              onClick={() => setActiveCategory(activeCategory === category ? null : category)}
             >
               {category}
             </button>
@@ -91,10 +78,7 @@ const MedicationsPage: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setActiveCategory(null);
-                fetchMedications();
-              }}
+              onClick={() => setActiveCategory(null)}
               className="text-xs"
             >
               {t('medications.clearFilters')}
@@ -104,16 +88,13 @@ const MedicationsPage: React.FC = () => {
       </div>
 
       <div>
-        {medications.length === 0 ? (
+        {filteredMedications.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-600 mb-4">{t('medications.noResults')}</p>
-            <Button onClick={() => fetchMedications()} variant="outline">
-              {t('medications.viewAll')}
-            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {medications.map((medication, index) => (
+            {filteredMedications.map((medication, index) => (
               <motion.div
                 key={medication.id}
                 initial={{ opacity: 0, y: 20 }}

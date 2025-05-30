@@ -156,7 +156,9 @@
     "useMyLocation": "Use My Location",
     "pharmaciesIn": "Pharmacies in {{city}}",
     "noResults": "No pharmacies found in this location.",
-    "viewAll": "View All"
+    "viewAll": "View All",
+        "allPharmacies": "All Pharmacies"
+
   },
   "errors": {
     "geolocationNotSupported": "Geolocation is not supported by your browser."
